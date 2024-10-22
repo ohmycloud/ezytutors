@@ -19,8 +19,3 @@ Content-Type: application/json
     "tutor_id":2,
     "course_name":"Hello , my second course !"
 }
-
-###
-
-
-
