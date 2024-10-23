@@ -9,3 +9,5 @@ dotenv = "0.15.0"
 openssl = { version = "0.10.68", features = ["vendored"] }
 serde = { version = "1.0.213", features = ["derive"] }
 sqlx = { version = "0.8.2", default-features = false, features = ["postgres", "runtime-tokio-native-tls", "macros", "chrono"] }
+actix-rt = "2.10.0"
+actix-web = "4.9.0"
