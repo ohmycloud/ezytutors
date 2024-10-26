@@ -13,21 +13,21 @@ pub async fn health_check_handler(app_state: web::Data<AppState>) -> HttpRespons
 
 pub async fn get_courses_for_tutor(
     app_state: web::Data<AppState>,
-    params: web::Path<(u32, )>,
+    params: web::Path<(i32, )>,
 ) -> HttpResponse {
     let tuple = params.into_inner();
-    let tutor_id: u32 = u32::try_from(tuple.0).unwrap();
+    let tutor_id: i32 = i32::try_from(tuple.0).unwrap();
     let courses = get_courses_for_tutor_db(&app_state.db, tutor_id).await;
     HttpResponse::Ok().json(courses)
 }
 
 pub async fn get_course_details(
     app_state: web::Data<AppState>,
-    params: web::Path<(u32, u32)>,
+    params: web::Path<(i32, i32)>,
 ) -> HttpResponse {
     let tuple = params.into_inner();
-    let tutor_id: u32 = u32::try_from(tuple.0).unwrap();
-    let course_id: u32 = u32::try_from(tuple.1).unwrap();
+    let tutor_id: i32 = i32::try_from(tuple.0).unwrap();
+    let course_id: i32 = i32::try_from(tuple.1).unwrap();
     let course = get_course_details_db(
         &app_state.db,
         tutor_id,
@@ -46,4 +46,61 @@ pub async fn post_new_course(
     ).await;
 
     HttpResponse::Ok().json(course)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+    use std::sync::Mutex;
+    use actix_web::App;
+    use actix_web::error::ParseError::Status;
+    use actix_web::http::StatusCode;
+    use chrono::NaiveDate;
+    use dotenv::dotenv;
+    use sqlx::PgPool;
+    use super::*;
+
+    #[actix_rt::test]
+    async fn get_all_courses_success() {
+        dotenv().ok();
+        let database_url = env::var("DATABASE_URL").expect(
+            "DATABASE_URL is not set in .env file"
+        );
+        let pool: PgPool = PgPool::connect(&database_url).await.unwrap();
+        let app_state: web::Data<AppState> = web::Data::new(AppState {
+            health_check_response: "".to_string(),
+            visit_count: Mutex::new(0),
+            db: pool,
+        });
+
+        let tutor_id: web::Path<(i32, )> = web::Path::from((1, ));
+        let resp = get_courses_for_tutor(app_state, tutor_id).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[actix_rt::test]
+    async fn post_course_success() {
+        dotenv().ok();
+        let database_url = env::var("DATABASE_URL").expect(
+            "DATABASE_URL is not set in .env file"
+        );
+        let pool: PgPool = PgPool::connect(&database_url).await.unwrap();
+        let app_state: web::Data<AppState> = web::Data::new(AppState {
+            health_check_response: "".to_string(),
+            visit_count: Mutex::new(0),
+            db: pool,
+        });
+
+        let new_course_msg = Course {
+            course_id: 1,
+            tutor_id: 1,
+            course_name: "This is the next course".into(),
+            posted_time: Some(NaiveDate::from_ymd(2020,9, 17).and_hms(
+                14, 01, 11
+            )),
+        };
+        let course_param = web::Json(new_course_msg);
+        let resp = post_new_course(course_param, app_state).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
 }
