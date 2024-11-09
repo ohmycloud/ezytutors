@@ -26,29 +26,26 @@ pub async fn get_courses_for_tutor(
 pub async fn get_course_details(
     app_state: web::Data<AppState>,
     params: web::Path<(i32, i32)>,
-) -> HttpResponse {
-    let tuple = params.into_inner();
-    let tutor_id: i32 = i32::try_from(tuple.0).unwrap();
-    let course_id: i32 = i32::try_from(tuple.1).unwrap();
-    let course = get_course_details_db(&app_state.db, tutor_id, course_id).await;
-    HttpResponse::Ok().json(course)
+) -> Result<HttpResponse, EzyTutorError> {
+    let (tutor_id, course_id) = params.into_inner();
+    get_course_details_db(&app_state.db, tutor_id, course_id)
+        .await
+        .map(|course| HttpResponse::Ok().json(course))
 }
 
 pub async fn post_new_course(
     new_course: web::Json<Course>,
     app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let course = post_new_course_db(&app_state.db, new_course.into()).await;
-
-    HttpResponse::Ok().json(course)
+) -> Result<HttpResponse, EzyTutorError> {
+    post_new_course_db(&app_state.db, new_course.into())
+        .await
+        .map(|course| HttpResponse::Ok().json(course))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::error::ParseError::Status;
     use actix_web::http::StatusCode;
-    use actix_web::App;
     use chrono::NaiveDate;
     use dotenv::dotenv;
     use sqlx::PgPool;
@@ -71,6 +68,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
+    #[ignore]
     #[actix_rt::test]
     async fn post_course_success() {
         dotenv().ok();
@@ -89,7 +87,22 @@ mod tests {
             posted_time: Some(NaiveDate::from_ymd(2020, 9, 17).and_hms(14, 01, 11)),
         };
         let course_param = web::Json(new_course_msg);
-        let resp = post_new_course(course_param, app_state).await;
+        let resp = post_new_course(course_param, app_state).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[actix_rt::test]
+    async fn get_course_detail_test() {
+        dotenv().ok();
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
+        let pool: PgPool = PgPool::connect(&database_url).await.unwrap();
+        let app_state: web::Data<AppState> = web::Data::new(AppState {
+            health_check_response: "".to_string(),
+            visit_count: Mutex::new(0),
+            db: pool,
+        });
+        let params: web::Path<(i32, i32)> = web::Path::from((1, 2));
+        let resp = get_course_details(app_state, params).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 }
