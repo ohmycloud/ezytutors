@@ -1,7 +1,8 @@
-use actix_web::{web, HttpResponse};
 use crate::db_access::{get_course_details_db, get_courses_for_tutor_db, post_new_course_db};
+use crate::errors::EzyTutorError;
 use crate::models::Course;
 use crate::state::AppState;
+use actix_web::{web, HttpResponse};
 
 pub async fn health_check_handler(app_state: web::Data<AppState>) -> HttpResponse {
     let health_check_response = &app_state.health_check_response;
@@ -13,12 +14,13 @@ pub async fn health_check_handler(app_state: web::Data<AppState>) -> HttpRespons
 
 pub async fn get_courses_for_tutor(
     app_state: web::Data<AppState>,
-    params: web::Path<(i32, )>,
-) -> HttpResponse {
+    params: web::Path<(i32,)>,
+) -> Result<HttpResponse, EzyTutorError> {
     let tuple = params.into_inner();
     let tutor_id: i32 = i32::try_from(tuple.0).unwrap();
-    let courses = get_courses_for_tutor_db(&app_state.db, tutor_id).await;
-    HttpResponse::Ok().json(courses)
+    get_courses_for_tutor_db(&app_state.db, tutor_id)
+        .await
+        .map(|courses| HttpResponse::Ok().json(courses))
 }
 
 pub async fn get_course_details(
@@ -28,11 +30,7 @@ pub async fn get_course_details(
     let tuple = params.into_inner();
     let tutor_id: i32 = i32::try_from(tuple.0).unwrap();
     let course_id: i32 = i32::try_from(tuple.1).unwrap();
-    let course = get_course_details_db(
-        &app_state.db,
-        tutor_id,
-        course_id
-    ).await;
+    let course = get_course_details_db(&app_state.db, tutor_id, course_id).await;
     HttpResponse::Ok().json(course)
 }
 
@@ -40,32 +38,27 @@ pub async fn post_new_course(
     new_course: web::Json<Course>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let course = post_new_course_db(
-        &app_state.db,
-        new_course.into()
-    ).await;
+    let course = post_new_course_db(&app_state.db, new_course.into()).await;
 
     HttpResponse::Ok().json(course)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-    use std::sync::Mutex;
-    use actix_web::App;
+    use super::*;
     use actix_web::error::ParseError::Status;
     use actix_web::http::StatusCode;
+    use actix_web::App;
     use chrono::NaiveDate;
     use dotenv::dotenv;
     use sqlx::PgPool;
-    use super::*;
+    use std::env;
+    use std::sync::Mutex;
 
     #[actix_rt::test]
     async fn get_all_courses_success() {
         dotenv().ok();
-        let database_url = env::var("DATABASE_URL").expect(
-            "DATABASE_URL is not set in .env file"
-        );
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
         let pool: PgPool = PgPool::connect(&database_url).await.unwrap();
         let app_state: web::Data<AppState> = web::Data::new(AppState {
             health_check_response: "".to_string(),
@@ -73,17 +66,15 @@ mod tests {
             db: pool,
         });
 
-        let tutor_id: web::Path<(i32, )> = web::Path::from((1, ));
-        let resp = get_courses_for_tutor(app_state, tutor_id).await;
+        let tutor_id: web::Path<(i32,)> = web::Path::from((1,));
+        let resp = get_courses_for_tutor(app_state, tutor_id).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[actix_rt::test]
     async fn post_course_success() {
         dotenv().ok();
-        let database_url = env::var("DATABASE_URL").expect(
-            "DATABASE_URL is not set in .env file"
-        );
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
         let pool: PgPool = PgPool::connect(&database_url).await.unwrap();
         let app_state: web::Data<AppState> = web::Data::new(AppState {
             health_check_response: "".to_string(),
@@ -95,9 +86,7 @@ mod tests {
             course_id: 1,
             tutor_id: 1,
             course_name: "This is the next course".into(),
-            posted_time: Some(NaiveDate::from_ymd(2020,9, 17).and_hms(
-                14, 01, 11
-            )),
+            posted_time: Some(NaiveDate::from_ymd(2020, 9, 17).and_hms(14, 01, 11)),
         };
         let course_param = web::Json(new_course_msg);
         let resp = post_new_course(course_param, app_state).await;
