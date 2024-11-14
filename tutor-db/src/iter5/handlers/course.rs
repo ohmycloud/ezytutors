@@ -199,7 +199,7 @@ mod tests {
             db: pool,
         });
         let params: web::Path<(i32, i32)> = web::Path::from((1, 21));
-        let resp = delete_course(app_state, params).await.unwrap();
+        let resp = delete_course(app_state, params).await;
         match resp {
             Ok(_) => println!("Something wrong"),
             Err(err) => assert_eq!(err.status_code(), StatusCode::NOT_FOUND),
