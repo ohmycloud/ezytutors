@@ -11,7 +11,7 @@ create table ezy_tutor_c6 (
     tutor_profile varchar(2000) not null
 );
 
-create table ezy_course_c6
+create table ezy_course_c6(
     course_id serial primary key,
     tutor_id INT not null,
     course_name varchar(140) not null,
@@ -29,9 +29,9 @@ create table ezy_course_c6
     ON DELETE cascade
 );
 
-grant all privileges on table ezy_tutor_c6 to <username>;
-grant all privileges on table ezy_course_c6 to <username>;
-grant all privileges on all sequences in schema public to <username>;
+grant all privileges on table ezy_tutor_c6 to truuser;
+grant all privileges on table ezy_course_c6 to truuser;
+grant all privileges on all sequences in schema public to truuser;
 
 /* Load seed data for testing */
 insert into ezy_tutor_c6(tutor_id, tutor_name, tutor_pic_url,tutor_profile)
