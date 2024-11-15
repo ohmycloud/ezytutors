@@ -1,15 +1,16 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use actix_web::{error, HttpResponse, HttpResponseBuilder};
 use actix_web::http::StatusCode;
+use actix_web::{error, HttpResponse, HttpResponseBuilder};
 use serde::Serialize;
 use sqlx::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Serialize)]
 pub enum EzyTutorError {
     DBError(String),
     ActixError(String),
     NotFound(String),
+    InvalidInput(String),
 }
 
 #[derive(Debug, Serialize)]
@@ -30,6 +31,10 @@ impl EzyTutorError {
             }
             EzyTutorError::NotFound(msg) => {
                 println!("Not found error occurred: {:?}", msg);
+                msg.into()
+            }
+            EzyTutorError::InvalidInput(msg) => {
+                println!("Invalid parameters received: {:?}", msg);
                 msg.into()
             }
         }
@@ -57,16 +62,16 @@ impl From<sqlx::error::Error> for EzyTutorError {
 impl error::ResponseError for EzyTutorError {
     fn status_code(&self) -> StatusCode {
         match self {
-            EzyTutorError::DBError(msg) | EzyTutorError::ActixError(msg) => {
+            EzyTutorError::DBError(_msg) | EzyTutorError::ActixError(_msg) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
-            EzyTutorError::NotFound(msg) => StatusCode::NOT_FOUND,
+            EzyTutorError::InvalidInput(_msg) => StatusCode::BAD_REQUEST,
+            EzyTutorError::NotFound(_msg) => StatusCode::NOT_FOUND,
         }
     }
     fn error_response(&self) -> HttpResponse {
-        HttpResponseBuilder::new(self.status_code())
-            .json(MyErrorResponse {
-                error_message: self.error_response(),
-            })
+        HttpResponseBuilder::new(self.status_code()).json(MyErrorResponse {
+            error_message: self.error_response(),
+        })
     }
 }
